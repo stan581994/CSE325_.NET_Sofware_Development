@@ -1,0 +1,10 @@
+Sales Summary
+----------------------------
+ Total Sales: $102,567.40
+
+ Details:
+  january_sales.txt: $15,750.50
+  february_sales.txt: $18,920.75
+  march_sales.txt: $22,340.25
+  april_sales.txt: $19,875.00
+  may_sales.txt: $25,680.90
