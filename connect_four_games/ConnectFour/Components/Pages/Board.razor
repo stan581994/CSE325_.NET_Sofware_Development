@@ -1,0 +1,200 @@
+@page "/board"
+@rendermode InteractiveServer
+
+<PageTitle>Connect Four - Game Board</PageTitle>
+
+<div class="game-container">
+    <header class="game-header">
+        <h1>🔴🟡 Connect Four 🟡🔴</h1>
+        <p class="game-subtitle">Drop your pieces and get four in a row to win!</p>
+    </header>
+
+    <div class="game-layout">
+        <main class="game-board-section" role="main" aria-label="Connect Four Game Board">
+            <div class="game-status" role="status" aria-live="polite">
+                @if (!string.IsNullOrEmpty(winnerMessage))
+                {
+                    <div class="winner-announcement">
+                        <h2>🎉 @winnerMessage 🎉</h2>
+                        <button class="reset-button" @onclick="ResetGame" aria-label="Start a new game">
+                            🔄 New Game
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="current-turn">
+                        <div class="turn-display">
+                            <h2>@CurrentTurn</h2>
+                            <span class="player-indicator player@(State.PlayerTurn)"></span>
+                        </div>
+                    </div>
+                }
+                
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-message" role="alert">
+                        ⚠️ @errorMessage
+                    </div>
+                }
+            </div>
+
+            <nav class="column-controls" role="navigation" aria-label="Column selection">
+                @for (byte i = 0; i < 7; i++)
+                {
+                    var col = i;
+                    var isDisabled = !string.IsNullOrEmpty(winnerMessage) || State.TheBoard[col] != 0;
+                    <button class="column-button @(isDisabled ? "disabled" : "")" 
+                            @onclick="() => PlayPiece(col)" 
+                            disabled="@isDisabled"
+                            aria-label="Drop piece in column @(col + 1)"
+                            title="Column @(col + 1)">
+                        <span class="drop-arrow">⬇️</span>
+                        <span class="column-number">@(col + 1)</span>
+                    </button>
+                }
+            </nav>
+
+            <div class="board-container" role="region" aria-label="Game board">
+                <div class="board">
+                @for (var i = 0; i < 42; i++)
+                {
+                    <span class="container">
+                        <span></span>
+                    </span>
+                }
+                </div>
+                @for (var i = 0; i < 42; i++)
+                {
+                   <span class="@pieces[i]"></span>
+                }
+            </div>
+        </main>
+
+        <aside class="game-sidebar" role="complementary" aria-label="Game information">
+            <div class="move-history">
+                <h3>📝 Move History</h3>
+                <div class="move-list" role="log" aria-live="polite">
+                    @if (moveHistory.Count == 0)
+                    {
+                        <p class="no-moves">No moves yet. Start playing!</p>
+                    }
+                    else
+                    {
+                        @for (int i = moveHistory.Count - 1; i >= 0; i--)
+                        {
+                            var move = moveHistory[i];
+                            <div class="move-item">
+                                <span class="move-number">@(i + 1).</span>
+                                <span class="player-icon player@(move.Player)">@(move.Player == 1 ? "🔴" : "🟡")</span>
+                                <span class="move-details">Column @(move.Column + 1)</span>
+                                <span class="move-time">@move.Timestamp.ToString("HH:mm:ss")</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="game-stats">
+                <h3>📊 Game Stats</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Moves:</span>
+                        <span class="stat-value">@State.CurrentTurn</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Player 1 Pieces:</span>
+                        <span class="stat-value">@State.TheBoard.Count(x => x == 1)</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Player 2 Pieces:</span>
+                        <span class="stat-value">@State.TheBoard.Count(x => x == 2)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-controls">
+                <h3>🎮 Controls</h3>
+                <div class="controls-info">
+                    <p>🖱️ Click column buttons to drop pieces</p>
+                    <p>⌨️ Use Tab to navigate between columns</p>
+                    <p>🔄 Reset button appears when game ends</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+@code {
+    private string[] pieces = new string[42];
+    private GameState State = new GameState();
+    private string winnerMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private List<MoveRecord> moveHistory = new List<MoveRecord>();
+
+    public class MoveRecord
+    {
+        public int Player { get; set; }
+        public int Column { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+
+    private string CurrentTurn => (winnerMessage == string.Empty) ? $"Player {State.PlayerTurn}'s Turn" : "";
+    private string ResetStyle => (winnerMessage == string.Empty) ? "display: none;" : "";
+
+    protected override void OnInitialized()
+    {
+        State.ResetBoard();
+    }
+
+    private void PlayPiece(byte col)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            var player = State.PlayerTurn;
+            var turn = State.CurrentTurn;
+            var landingRow = State.PlayPiece(col);
+            pieces[turn] = $"player{player} col{col} drop{landingRow}";
+            
+            // Add move to history
+            moveHistory.Add(new MoveRecord 
+            { 
+                Player = player, 
+                Column = col, 
+                Timestamp = DateTime.Now 
+            });
+            
+            // Check for winner
+            var winState = State.CheckForWin();
+            if (winState == GameState.WinState.Player1_Wins)
+            {
+                winnerMessage = "Player 1 Wins!";
+            }
+            else if (winState == GameState.WinState.Player2_Wins)
+            {
+                winnerMessage = "Player 2 Wins!";
+            }
+            else if (winState == GameState.WinState.Tie)
+            {
+                winnerMessage = "It's a Tie!";
+            }
+            
+            StateHasChanged();
+        }
+        catch (ArgumentException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void ResetGame()
+    {
+        State.ResetBoard();
+        pieces = new string[42];
+        winnerMessage = string.Empty;
+        errorMessage = string.Empty;
+        moveHistory.Clear();
+        StateHasChanged();
+    }
+}
